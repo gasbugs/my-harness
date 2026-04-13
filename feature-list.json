@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "project": "my-harness",
+  "last_updated": "2026-04-13",
+  "features": [
+    {
+      "id": "feat-001",
+      "name": "환경 초기화",
+      "description": "init.sh가 오류 없이 실행되고 모든 필수 도구를 검증하며 feature-list.json 무결성을 확인하고 git 저장소 상태를 확인한다.",
+      "passes": false,
+      "notes": "검증 방법: 프로젝트 루트에서 'bash init.sh' 실행; 종료 코드 0; 모든 스모크 테스트 PASS. 증거 필요: init.sh 전체 출력을 claude-progress.txt에 붙여넣기."
+    },
+    {
+      "id": "feat-002",
+      "name": "Git 히스토리 무결성",
+      "description": "모든 커밋이 Feature, Tests, Progress 푸터 필드를 포함하고 git 로그가 깨끗하고 선형적이다.",
+      "passes": false,
+      "notes": "검증 방법: 'git log --oneline'에 최소 2개 커밋; 'git log'에 모든 필수 푸터 필드 포함. 증거 필요: git log 출력 붙여넣기."
+    },
+    {
+      "id": "feat-003",
+      "name": "진행 로그 연속성",
+      "description": "claude-progress.txt가 존재하고 최소 하나의 완전한 세션 블록을 포함하며 마지막 블록의 'Next Session Must' 섹션이 실행 가능하다.",
+      "passes": false,
+      "notes": "검증 방법: 파일 존재; '=== SESSION' grep 결과 최소 1건; 마지막 항목이 '=== END SESSION'으로 끝남. 증거 필요: 마지막 세션 블록 cat 출력."
+    },
+    {
+      "id": "feat-004",
+      "name": "E2E 테스트 인프라",
+      "description": "tests/e2e/ 디렉터리가 존재하고 실행 시 0으로 종료되는 테스트 스크립트가 최소 하나 포함된다.",
+      "passes": false,
+      "notes": "검증 방법: 'ls tests/e2e/'에 최소 1개 파일; 해당 파일 실행 시 종료 코드 0 및 PASS 출력. 증거 필요: 테스트 실행 출력 붙여넣기."
+    },
+    {
+      "id": "feat-005",
+      "name": "훅 통합",
+      "description": ".claude/settings.json의 SessionStart 훅이 session-start 스크립트를 통해 init.sh를 자동으로 실행하고 오류 없이 동작한다.",
+      "passes": false,
+      "notes": "검증 방법: .claude/settings.json에 hooks.SessionStart 설정 확인; init.sh 실행 권한(chmod +x) 확인; hooks/session-start가 유효한 JSON을 stdout으로 출력하는지 확인."
+    }
+  ]
+}
