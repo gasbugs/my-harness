@@ -71,28 +71,51 @@ fi
 # ── Step 2: ~/.claude/settings.json에 훅 병합 ────────────────
 info "Step 2: ~/.claude/settings.json 훅 설정 중..."
 
-HOOK_SESSION_START=$(cat <<'HOOKEOF'
-[{"hooks":[{"type":"command","command":"bash \"HARNESS_PLACEHOLDER/hooks/session-start\""}]}]
-HOOKEOF
-)
-HOOK_SESSION_START="${HOOK_SESSION_START/HARNESS_PLACEHOLDER/${HARNESS_DIR}}"
-
-HOOK_PRE_TOOL=$(cat <<'HOOKEOF'
-[{"matcher":"Write|Edit|MultiEdit","hooks":[{"type":"command","command":"bash \"HARNESS_PLACEHOLDER/hooks/pre-tool-guard\""}]}]
-HOOKEOF
-)
-HOOK_PRE_TOOL="${HOOK_PRE_TOOL/HARNESS_PLACEHOLDER/${HARNESS_DIR}}"
-
 if [ ! -f "${GLOBAL_SETTINGS}" ]; then
   warn "settings.json 없음 — 새로 생성합니다"
   echo '{}' > "${GLOBAL_SETTINGS}"
 fi
 
-# jq로 기존 설정을 보존하면서 hooks 키만 추가/업데이트
+# 각 훅 정의 (harness 경로 포함)
+SESSION_HOOK="{\"hooks\":[{\"type\":\"command\",\"command\":\"bash \\\"${HARNESS_DIR}/hooks/session-start\\\"\"}]}"
+PRE_TOOL_HOOK="{\"matcher\":\"Write|Edit|MultiEdit\",\"hooks\":[{\"type\":\"command\",\"command\":\"bash \\\"${HARNESS_DIR}/hooks/pre-tool-guard\\\"\"}]}"
+STOP_HOOK="{\"hooks\":[{\"type\":\"command\",\"command\":\"bash \\\"${HARNESS_DIR}/hooks/session-stop\\\"\"}]}"
+# bash-guard 훅 정의 (Bash 명령으로 feature-list.json 수정 차단)
+BASH_GUARD_HOOK="{\"matcher\":\"Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"bash \\\"${HARNESS_DIR}/hooks/bash-guard\\\"\"}]}"
+
+# 기존 배열에 append (이미 있으면 건너뜀)
 UPDATED_SETTINGS=$(jq \
-  --argjson session_start "${HOOK_SESSION_START}" \
-  --argjson pre_tool "${HOOK_PRE_TOOL}" \
-  '.hooks.SessionStart = $session_start | .hooks.PreToolUse = $pre_tool' \
+  --argjson session_hook "${SESSION_HOOK}" \
+  --argjson pre_tool_hook "${PRE_TOOL_HOOK}" \
+  --argjson stop_hook "${STOP_HOOK}" \
+  --argjson bash_guard_hook "${BASH_GUARD_HOOK}" \
+  --arg harness "${HARNESS_DIR}" \
+  '
+  # SessionStart: 하네스 훅이 없으면 추가
+  .hooks.SessionStart = (
+    (.hooks.SessionStart // []) +
+    (if (.hooks.SessionStart // [] | any(.[]; .hooks[]?.command? // "" | contains($harness + "/hooks/session-start")))
+     then [] else [$session_hook] end)
+  ) |
+  # PreToolUse: 하네스 pre-tool-guard가 없으면 추가
+  .hooks.PreToolUse = (
+    (.hooks.PreToolUse // []) +
+    (if (.hooks.PreToolUse // [] | any(.[]; .hooks[]?.command? // "" | contains($harness + "/hooks/pre-tool-guard")))
+     then [] else [$pre_tool_hook] end)
+  ) |
+  # PreToolUse Bash: bash-guard가 없으면 추가
+  .hooks.PreToolUse = (
+    (.hooks.PreToolUse // []) +
+    (if (.hooks.PreToolUse // [] | any(.[]; .hooks[]?.command? // "" | contains($harness + "/hooks/bash-guard")))
+     then [] else [$bash_guard_hook] end)
+  ) |
+  # Stop: 하네스 session-stop이 없으면 추가
+  .hooks.Stop = (
+    (.hooks.Stop // []) +
+    (if (.hooks.Stop // [] | any(.[]; .hooks[]?.command? // "" | contains($harness + "/hooks/session-stop")))
+     then [] else [$stop_hook] end)
+  )
+  ' \
   "${GLOBAL_SETTINGS}")
 
 echo "${UPDATED_SETTINGS}" > "${GLOBAL_SETTINGS}"
@@ -103,6 +126,8 @@ info "Step 3: hooks/ 실행 권한 설정 중..."
 chmod +x "${HARNESS_DIR}/init.sh"
 chmod +x "${HARNESS_DIR}/hooks/session-start"
 chmod +x "${HARNESS_DIR}/hooks/pre-tool-guard"
+# bash-guard 실행 권한 부여 (bash 명령 차단 훅)
+chmod +x "${HARNESS_DIR}/hooks/bash-guard"
 success "실행 권한 설정 완료"
 
 # ── 완료 요약 ─────────────────────────────────────────────────
@@ -116,6 +141,8 @@ echo "║  적용 내용:                                          ║"
 echo "║  • ~/.claude/CLAUDE.md: @import 추가됨              ║"
 echo "║  • ~/.claude/settings.json: SessionStart 훅 추가됨  ║"
 echo "║  • ~/.claude/settings.json: PreToolUse 훅 추가됨    ║"
+echo "║  • ~/.claude/settings.json: Bash 차단 훅 추가됨     ║"
+echo "║  • ~/.claude/settings.json: Stop 훅 추가됨          ║"
 echo "╚══════════════════════════════════════════════════════╝"
 echo ""
 

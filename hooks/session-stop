@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# ============================================================
+# hooks/session-stop — Claude Code Stop 훅
+# ============================================================
+# 목적: 세션 종료 전 claude-progress.txt 작성 여부를 확인하고
+#       미작성 시 에이전트에게 경고를 주입한다
+# 조건: $PWD/feature-list.json이 존재하는 하네스 프로젝트만
+# ============================================================
+
+set -uo pipefail
+
+FEATURE_LIST="${PWD}/feature-list.json"
+PROGRESS_FILE="${PWD}/claude-progress.txt"
+
+# 하네스 미설정 프로젝트면 스킵
+if [ ! -f "${FEATURE_LIST}" ]; then
+  exit 0
+fi
+
+# JSON 이스케이프 함수
+escape_for_json() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
+
+emit_context() {
+  local msg="$1"
+  local escaped
+  escaped=$(escape_for_json "$msg")
+  printf '{"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"%s"}}\n' "${escaped}"
+}
+
+# claude-progress.txt가 없으면 경고
+if [ ! -f "${PROGRESS_FILE}" ]; then
+  emit_context "⚠️ 하네스 경고: claude-progress.txt가 없습니다.
+응답하기 전에 다음을 수행하세요:
+1. claude-progress.txt를 생성하고 SESSION 1 블록을 작성하세요.
+2. CLAUDE.md의 진행 로그 형식을 따르세요.
+3. '=== END SESSION 1 ===' 로 블록을 닫으세요."
+  exit 0
+fi
+
+# 열린 세션 블록 수 계산 (SESSION 수 - END SESSION 수)
+OPEN_COUNT=$(awk '
+  /^=== SESSION [0-9]/ && !/TEMPLATE/ { open++ }
+  /^=== END SESSION [0-9]/ { open-- }
+  END { print (open > 0 ? open : 0) }
+' "${PROGRESS_FILE}")
+
+if [ "${OPEN_COUNT}" -gt 0 ]; then
+  LAST_SESSION=$(grep "^=== SESSION" "${PROGRESS_FILE}" | grep -v TEMPLATE | tail -1)
+  emit_context "⚠️ 하네스 경고: 닫히지 않은 세션 블록이 있습니다.
+마지막 세션: ${LAST_SESSION}
+
+응답하기 전에 다음을 수행하세요:
+1. claude-progress.txt의 마지막 세션 블록을 완성하세요.
+2. Completed, Blocked, Test Results, Next Session Must 섹션을 채우세요.
+3. '=== END SESSION N ===' 으로 블록을 닫으세요.
+4. 변경사항을 git commit 하세요."
+  exit 0
+fi
+
+# 정상 — 마지막 세션 정보만 확인
+LAST_CLOSED=$(grep "^=== END SESSION" "${PROGRESS_FILE}" | grep -v TEMPLATE | tail -1 || echo "없음")
+emit_context "✅ 하네스: 진행 로그 정상 (${LAST_CLOSED}). 세션을 마무리합니다."
+
+exit 0

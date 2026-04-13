@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# ============================================================
+# hooks/bash-guard — Bash를 통한 feature-list.json 수정 차단
+# ============================================================
+# 목적: bash 명령으로 feature-list.json을 직접 수정하는 것을 감지
+# 종료 코드 0 = 허용, 2 = 차단
+# ============================================================
+
+set -uo pipefail
+
+FEATURE_LIST="${PWD}/feature-list.json"
+
+# 하네스 미설정 프로젝트면 스킵
+if [ ! -f "${FEATURE_LIST}" ]; then
+  exit 0
+fi
+
+# stdin에서 도구 입력 읽기
+TOOL_INPUT=$(cat)
+
+# Bash 도구인지 확인
+TOOL_NAME=$(echo "${TOOL_INPUT}" | jq -r '.tool_name // ""' 2>/dev/null || echo "")
+if [ "${TOOL_NAME}" != "Bash" ]; then
+  exit 0
+fi
+
+# 실행할 명령어 추출
+COMMAND=$(echo "${TOOL_INPUT}" | jq -r '.tool_input.command // ""' 2>/dev/null || echo "")
+
+# feature-list.json이 명령에 없으면 통과
+if ! echo "${COMMAND}" | grep -q "feature-list\.json"; then
+  exit 0
+fi
+
+# 읽기 전용 패턴: jq 읽기, cat, grep, head, tail, less, wc → 허용
+if echo "${COMMAND}" | grep -qE "^\s*(jq\s+'[^']*'\s+['\"]?[^ ]*feature-list|cat\s+['\"]?[^ ]*feature-list|grep\s+.*feature-list|head\s+.*feature-list|tail\s+.*feature-list|wc\s+.*feature-list)"; then
+  exit 0
+fi
+
+# 쓰기 패턴 감지
+WRITE_DETECTED=false
+REASON=""
+
+# 패턴 1: 출력 리디렉션 (> 단, >> 제외)
+# macOS grep은 -P(Perl 정규식)를 지원하지 않으므로 ERE로 대체
+# '>>' 가 없는 단순 '>' 리디렉션을 감지 (>> 는 허용)
+if echo "${COMMAND}" | grep -qE '[^>]>[^>][^ ]*feature-list|[^ ]*feature-list[^ ]*[^>]>[^>]'; then
+  WRITE_DETECTED=true
+  REASON="출력 리디렉션(>) 으로 feature-list.json 수정 시도"
+fi
+
+# 패턴 2: sed -i (인플레이스 편집)
+if echo "${COMMAND}" | grep -qE "sed\s+(-[a-zA-Z]*i|-i)[^|]*feature-list"; then
+  WRITE_DETECTED=true
+  REASON="sed -i 로 feature-list.json 수정 시도"
+fi
+
+# 패턴 3: mv/cp 로 feature-list.json 덮어쓰기
+if echo "${COMMAND}" | grep -qE "(mv|cp)\s+[^ ]+\s+[^ ]*feature-list\.json"; then
+  WRITE_DETECTED=true
+  REASON="mv/cp 로 feature-list.json 덮어쓰기 시도"
+fi
+
+# 패턴 4: tee
+if echo "${COMMAND}" | grep -qE "tee\s+[^ ]*feature-list"; then
+  WRITE_DETECTED=true
+  REASON="tee 로 feature-list.json 수정 시도"
+fi
+
+# 패턴 5: python/perl 인라인 수정
+if echo "${COMMAND}" | grep -qE "(python3?|perl)\s+-c.*feature-list|python3?.*open.*feature-list.*['\"]w['\"]"; then
+  WRITE_DETECTED=true
+  REASON="스크립트 인라인 실행으로 feature-list.json 수정 시도"
+fi
+
+if [ "${WRITE_DETECTED}" = true ]; then
+  echo "[bash-guard] 차단: ${REASON}" >&2
+  echo "[bash-guard] feature-list.json은 Edit 도구로만 수정 가능하며, passes 필드만 변경할 수 있습니다." >&2
+  exit 2
+fi
+
+exit 0

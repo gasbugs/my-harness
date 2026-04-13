@@ -62,6 +62,7 @@ cat > "${TARGET_DIR}/feature-list.json" <<FEATUREOF
       "id": "feat-001",
       "name": "첫 번째 기능",
       "description": "이 기능이 무엇을 하는지 명확하게 설명하세요.",
+      "priority": "high",
       "passes": false,
       "notes": "검증 방법: ... / 증거 필요: ..."
     },
@@ -69,6 +70,7 @@ cat > "${TARGET_DIR}/feature-list.json" <<FEATUREOF
       "id": "feat-002",
       "name": "두 번째 기능",
       "description": "이 기능이 무엇을 하는지 명확하게 설명하세요.",
+      "priority": "medium",
       "passes": false,
       "notes": "검증 방법: ... / 증거 필요: ..."
     }
