@@ -10,7 +10,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="${SCRIPT_DIR}"
+# 환경변수 PROJECT_ROOT가 설정되어 있으면 그것을 사용, 없으면 스크립트 위치 사용
+PROJECT_ROOT="${PROJECT_ROOT:-${SCRIPT_DIR}}"
 PROGRESS_FILE="${PROJECT_ROOT}/claude-progress.txt"
 FEATURE_LIST="${PROJECT_ROOT}/feature-list.json"
 LOG_PREFIX="[init.sh]"
@@ -97,8 +98,20 @@ else
   warn "claude-progress.txt 없음 — 첫 번째 세션으로 판단됨 (Initializer Agent 모드)"
 fi
 
-# ── 6단계: 스모크 테스트 실행 ────────────────────────────────
-info "Step 6: 스모크 테스트 실행 중..."
+# ── 6단계: 최근 git 히스토리 표시 ──────────────────────────
+info "Step 6: 최근 git 히스토리 확인 중..."
+if [ -d "${PROJECT_ROOT}/.git" ]; then
+  echo ""
+  echo "─── 최근 커밋 히스토리 (최대 10개) ──────────────────"
+  git -C "${PROJECT_ROOT}" log --oneline -10 2>/dev/null || echo "  (커밋 없음)"
+  echo "────────────────────────────────────────────────────"
+  echo ""
+else
+  warn "git 저장소 없음 — 히스토리 표시 생략"
+fi
+
+# ── 7단계: 스모크 테스트 실행 ────────────────────────────────
+info "Step 7: 스모크 테스트 실행 중..."
 
 SMOKE_PASS=true
 SMOKE_RESULTS=()
@@ -155,8 +168,8 @@ fi
 
 info "모든 스모크 테스트 PASS"
 
-# ── 7단계: 환경 요약 출력 ────────────────────────────────────
-info "Step 7: 환경 요약"
+# ── 8단계: 환경 요약 출력 ────────────────────────────────────
+info "Step 8: 환경 요약"
 echo ""
 echo "╔══════════════════════════════════════════════════════╗"
 echo "║           하네스 환경 준비 완료                      ║"
