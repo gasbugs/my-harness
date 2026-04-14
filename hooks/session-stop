@@ -32,7 +32,8 @@ emit_context() {
   local msg="$1"
   local escaped
   escaped=$(escape_for_json "$msg")
-  printf '{"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"%s"}}\n' "${escaped}"
+  # Stop 훅은 hookSpecificOutput을 지원하지 않으므로 systemMessage 사용
+  printf '{"systemMessage":"%s"}\n' "${escaped}"
 }
 
 # claude-progress.txt가 없으면 경고
