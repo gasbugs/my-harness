@@ -50,6 +50,21 @@ if ! echo "${NEW_CONTENT}" | jq empty 2>/dev/null; then
   exit 2
 fi
 
+# 플레이스홀더 상태 감지 — 초기 설정 단계면 보호 필드 수정 허용
+# 조건: 예시 기능명("첫 번째 기능" 또는 "두 번째 기능")이 존재할 때만 허용
+# (기능 수 기반 조건은 실제 작업 중인 프로젝트와 구분 불가하여 제외)
+IS_PLACEHOLDER=false
+PLACEHOLDER_BY_NAME=$(jq -r '[.features[].name] | map(select(. == "첫 번째 기능" or . == "두 번째 기능")) | length' "${FEATURE_LIST}" 2>/dev/null || echo "0")
+
+if [ "${PLACEHOLDER_BY_NAME}" -gt 0 ]; then
+  IS_PLACEHOLDER=true
+fi
+
+if [ "${IS_PLACEHOLDER}" = "true" ]; then
+  # 초기 설정 단계 — 보호 필드 수정 허용
+  exit 0
+fi
+
 # 보호 필드 비교 (id, name, description, notes)
 CURRENT_PROTECTED=$(jq -c '[.features[] | {id,name,description,notes}]' "${FEATURE_LIST}" 2>/dev/null || echo "")
 PROPOSED_PROTECTED=$(echo "${NEW_CONTENT}" | jq -c '[.features[] | {id,name,description,notes}]' 2>/dev/null || echo "")
