@@ -15,8 +15,11 @@ CURRENT_PROJECT="${PWD}"
 
 # ── 현재 프로젝트에 하네스 파일이 있는지 확인 ───────────────
 if [ ! -f "${CURRENT_PROJECT}/feature-list.json" ]; then
-  # 하네스 미설정 프로젝트 — 간단한 안내만 출력
-  CONTEXT="이 프로젝트에는 하네스가 설정되어 있지 않습니다. 장기 프로젝트에 하네스를 추가하려면 bash ${HARNESS_DIR}/new-project.sh 를 실행하세요."
+  # 하네스 미설정 프로젝트 — 사용자에게 설치 여부 확인 요청
+  CONTEXT="이 프로젝트(${CURRENT_PROJECT})에는 하네스가 설정되어 있지 않습니다.
+사용자에게 다음을 물어보세요: '이 프로젝트에 하네스를 설정할까요?'
+- 사용자가 동의하면: bash ${HARNESS_DIR}/new-project.sh 를 실행한 뒤, feature-list.json을 열어 기능 목록을 작성하도록 안내하세요.
+- 사용자가 거부하면: 그냥 진행하세요."
 
   escape_for_json() {
     local s="$1"

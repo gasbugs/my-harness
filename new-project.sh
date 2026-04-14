@@ -111,6 +111,19 @@ info "Step 3: tests/e2e 디렉터리 생성 중..."
 mkdir -p "${TARGET_DIR}/tests/e2e"
 success "tests/e2e 디렉터리 생성 완료"
 
+# ── Step 4: .gitignore에 claude-progress.txt 추가 ─────────────
+info "Step 4: .gitignore에 claude-progress.txt 추가 중..."
+GITIGNORE="${TARGET_DIR}/.gitignore"
+if [ ! -f "${GITIGNORE}" ]; then
+  printf '# 하네스 세션 로그 — 개인 작업 기록이므로 공유하지 않음\nclaude-progress.txt\n' > "${GITIGNORE}"
+  success ".gitignore 생성 및 claude-progress.txt 추가 완료"
+elif grep -qF 'claude-progress.txt' "${GITIGNORE}"; then
+  success "claude-progress.txt가 이미 .gitignore에 있습니다"
+else
+  printf '\n# 하네스 세션 로그 — 개인 작업 기록이므로 공유하지 않음\nclaude-progress.txt\n' >> "${GITIGNORE}"
+  success ".gitignore에 claude-progress.txt 추가 완료"
+fi
+
 # ── 완료 안내 ─────────────────────────────────────────────────
 echo ""
 echo "╔══════════════════════════════════════════════════════╗"
@@ -118,7 +131,7 @@ echo "║        하네스 설정 완료!                             ║"
 echo "╠══════════════════════════════════════════════════════╣"
 echo "║  생성된 파일:                                        ║"
 printf "║    • %-47s ║\n" "feature-list.json  (기능 목록 편집 필요)"
-printf "║    • %-47s ║\n" "claude-progress.txt (자동 관리됨)"
+printf "║    • %-47s ║\n" "claude-progress.txt (gitignore됨)"
 printf "║    • %-47s ║\n" "tests/e2e/          (E2E 테스트 위치)"
 echo "╠══════════════════════════════════════════════════════╣"
 echo "║  다음 단계:                                          ║"
